@@ -13,8 +13,11 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
+#include "common/util/hash_util.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/hash_join_plan.h"
@@ -52,8 +55,16 @@ class HashJoinExecutor : public AbstractExecutor {
   auto GetOutputSchema() const -> const Schema & override { return plan_->OutputSchema(); };
 
  private:
-  /** The HashJoin plan node to be executed. */
+  /** The NestedLoopJoin plan node to be executed. */
   const HashJoinPlanNode *plan_;
+
+  std::unique_ptr<AbstractExecutor> left_executor_;
+  std::unique_ptr<AbstractExecutor> right_executor_;
+
+  std::unordered_map<hash_t, std::vector<Tuple>> hash_join_table_;
+
+  std::vector<Tuple> output_tuples_;
+  std::vector<Tuple>::const_iterator output_tuples_iter_;
 };
 
 }  // namespace bustub

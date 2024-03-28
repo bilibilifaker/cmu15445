@@ -17,13 +17,13 @@
 #include <list>
 #include <memory>
 #include <mutex>  // NOLINT
+#include <set>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include "common/config.h"
-#include "common/macros.h"
 #include "common/rid.h"
 #include "concurrency/transaction.h"
 
@@ -77,28 +77,16 @@ class LockManager {
   /**
    * Creates a new lock manager configured for the deadlock detection policy.
    */
-  LockManager() = default;
-
-  void StartDeadlockDetection() {
-    BUSTUB_ENSURE(txn_manager_ != nullptr, "txn_manager_ is not set.")
+  LockManager() {
     enable_cycle_detection_ = true;
     cycle_detection_thread_ = new std::thread(&LockManager::RunCycleDetection, this);
   }
 
-#ifndef DISABLE_LOCK_MANAGER
   ~LockManager() {
-    UnlockAll();
-
     enable_cycle_detection_ = false;
-
-    if (cycle_detection_thread_ != nullptr) {
-      cycle_detection_thread_->join();
-      delete cycle_detection_thread_;
-    }
+    cycle_detection_thread_->join();
+    delete cycle_detection_thread_;
   }
-#else
-  ~LockManager() = default;
-#endif
 
   /**
    * [LOCK_NOTE]
@@ -158,12 +146,8 @@ class LockManager {
    *    - If requested lock mode is the same as that of the lock presently held,
    *      Lock() should return true since it already has the lock.
    *    - If requested lock mode is different, Lock() should upgrade the lock held by the transaction.
-   *    - Basically there should be three steps to perform a lock upgrade in general
-   *      - 1. Check the precondition of upgrade
-   *      - 2. Drop the current lock, reserve the upgrade position
-   *      - 3. Wait to get the new lock granted
    *
-   *    A lock request being upgraded should be prioritized over other waiting lock requests on the same resource.
+   *    A lock request being upgraded should be prioritised over other waiting lock requests on the same resource.
    *
    *    While upgrading, only the following transitions should be allowed:
    *        IS -> [S, X, IX, SIX]
@@ -181,9 +165,6 @@ class LockManager {
    * BOOK KEEPING:
    *    If a lock is granted to a transaction, lock manager should update its
    *    lock sets appropriately (check transaction.h)
-   *
-   *    You probably want to consider which type of lock to directly apply on table
-   *    when implementing executor later
    */
 
   /**
@@ -280,10 +261,9 @@ class LockManager {
    * @param rid the RID that is locked by the transaction
    * @param oid the table_oid_t of the table the row belongs to
    * @param rid the RID of the row to be unlocked
-   * @param force unlock the tuple regardless of isolation level, not changing the transaction state
    * @return true if the unlock is successful, false otherwise
    */
-  auto UnlockRow(Transaction *txn, const table_oid_t &oid, const RID &rid, bool force = false) -> bool;
+  auto UnlockRow(Transaction *txn, const table_oid_t &oid, const RID &rid) -> bool;
 
   /*** Graph API ***/
 
@@ -318,22 +298,60 @@ class LockManager {
    */
   auto RunCycleDetection() -> void;
 
-  TransactionManager *txn_manager_;
+  auto GrantLock(const std::shared_ptr<LockRequest> &lock_request,
+                 const std::shared_ptr<LockRequestQueue> &lock_request_queue) -> bool;
+
+  auto InsertOrDeleteTableLockSet(Transaction *txn, const std::shared_ptr<LockRequest> &lock_request, bool insert)
+      -> void;
+
+  auto InsertOrDeleteRowLockSet(Transaction *txn, const std::shared_ptr<LockRequest> &lock_request, bool insert)
+      -> void;
+
+  auto InsertRowLockSet(const std::shared_ptr<std::unordered_map<table_oid_t, std::unordered_set<RID>>> &lock_set,
+                        const table_oid_t &oid, const RID &rid) -> void {
+    auto row_lock_set = lock_set->find(oid);
+    if (row_lock_set == lock_set->end()) {
+      lock_set->emplace(oid, std::unordered_set<RID>{});
+      row_lock_set = lock_set->find(oid);
+    }
+    row_lock_set->second.emplace(rid);
+  }
+
+  auto DeleteRowLockSet(const std::shared_ptr<std::unordered_map<table_oid_t, std::unordered_set<RID>>> &lock_set,
+                        const table_oid_t &oid, const RID &rid) -> void {
+    auto row_lock_set = lock_set->find(oid);
+    if (row_lock_set == lock_set->end()) {
+      return;
+    }
+    row_lock_set->second.erase(rid);
+  }
+
+  auto Dfs(txn_id_t txn_id) -> bool {
+    if (safe_set_.find(txn_id) != safe_set_.end()) {
+      return false;
+    }
+    active_set_.insert(txn_id);
+
+    std::vector<txn_id_t> &next_node_vector = waits_for_[txn_id];
+    std::sort(next_node_vector.begin(), next_node_vector.end());
+    for (txn_id_t const next_node : next_node_vector) {
+      if (active_set_.find(next_node) != active_set_.end()) {
+        return true;
+      }
+      if (Dfs(next_node)) {
+        return true;
+      }
+    }
+
+    active_set_.erase(txn_id);
+    safe_set_.insert(txn_id);
+    return false;
+  }
+
+  auto DeleteNode(txn_id_t txn_id) -> void;
 
  private:
-  /** Spring 2023 */
-  /* You are allowed to modify all functions below. */
-  auto UpgradeLockTable(Transaction *txn, LockMode lock_mode, const table_oid_t &oid) -> bool;
-  auto UpgradeLockRow(Transaction *txn, LockMode lock_mode, const table_oid_t &oid, const RID &rid) -> bool;
-  auto AreLocksCompatible(LockMode l1, LockMode l2) -> bool;
-  auto CanTxnTakeLock(Transaction *txn, LockMode lock_mode) -> bool;
-  void GrantNewLocksIfPossible(LockRequestQueue *lock_request_queue);
-  auto CanLockUpgrade(LockMode curr_lock_mode, LockMode requested_lock_mode) -> bool;
-  auto CheckAppropriateLockOnTable(Transaction *txn, const table_oid_t &oid, LockMode row_lock_mode) -> bool;
-  auto FindCycle(txn_id_t source_txn, std::vector<txn_id_t> &path, std::unordered_set<txn_id_t> &on_path,
-                 std::unordered_set<txn_id_t> &visited, txn_id_t *abort_txn_id) -> bool;
-  void UnlockAll();
-
+  /** Fall 2022 */
   /** Structure that holds lock requests for a given table oid */
   std::unordered_map<table_oid_t, std::shared_ptr<LockRequestQueue>> table_lock_map_;
   /** Coordination */
@@ -349,33 +367,13 @@ class LockManager {
   /** Waits-for graph representation. */
   std::unordered_map<txn_id_t, std::vector<txn_id_t>> waits_for_;
   std::mutex waits_for_latch_;
+
+  std::set<txn_id_t> safe_set_;
+  std::set<txn_id_t> txn_set_;
+  std::unordered_set<txn_id_t> active_set_;
+
+  std::unordered_map<txn_id_t, RID> map_txn_rid_;
+  std::unordered_map<txn_id_t, table_oid_t> map_txn_oid_;
 };
 
 }  // namespace bustub
-
-template <>
-struct fmt::formatter<bustub::LockManager::LockMode> : formatter<std::string_view> {
-  // parse is inherited from formatter<string_view>.
-  template <typename FormatContext>
-  auto format(bustub::LockManager::LockMode x, FormatContext &ctx) const {
-    string_view name = "unknown";
-    switch (x) {
-      case bustub::LockManager::LockMode::EXCLUSIVE:
-        name = "EXCLUSIVE";
-        break;
-      case bustub::LockManager::LockMode::INTENTION_EXCLUSIVE:
-        name = "INTENTION_EXCLUSIVE";
-        break;
-      case bustub::LockManager::LockMode::SHARED:
-        name = "SHARED";
-        break;
-      case bustub::LockManager::LockMode::INTENTION_SHARED:
-        name = "INTENTION_SHARED";
-        break;
-      case bustub::LockManager::LockMode::SHARED_INTENTION_EXCLUSIVE:
-        name = "SHARED_INTENTION_EXCLUSIVE";
-        break;
-    }
-    return formatter<string_view>::format(name, ctx);
-  }
-};

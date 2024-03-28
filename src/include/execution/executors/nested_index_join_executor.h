@@ -34,8 +34,8 @@ class NestIndexJoinExecutor : public AbstractExecutor {
  public:
   /**
    * Creates a new nested index join executor.
-   * @param exec_ctx the context that the nested index join should be performed in
-   * @param plan the nested index join plan to be executed
+   * @param exec_ctx the context that the hash join should be performed in
+   * @param plan the nested index join plan node
    * @param child_executor the outer table
    */
   NestIndexJoinExecutor(ExecutorContext *exec_ctx, const NestedIndexJoinPlanNode *plan,
@@ -50,5 +50,10 @@ class NestIndexJoinExecutor : public AbstractExecutor {
  private:
   /** The nested index join plan node. */
   const NestedIndexJoinPlanNode *plan_;
+
+  std::unique_ptr<AbstractExecutor> child_;
+  const IndexInfo *index_info_;
+  const TableInfo *table_info_;
+  BPlusTreeIndexForOneIntegerColumn *tree_;
 };
 }  // namespace bustub

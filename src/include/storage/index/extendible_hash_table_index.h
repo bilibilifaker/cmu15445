@@ -33,7 +33,7 @@ class ExtendibleHashTableIndex : public Index {
 
   ~ExtendibleHashTableIndex() override = default;
 
-  auto InsertEntry(const Tuple &key, RID rid, Transaction *transaction) -> bool override;
+  void InsertEntry(const Tuple &key, RID rid, Transaction *transaction) override;
 
   void DeleteEntry(const Tuple &key, RID rid, Transaction *transaction) override;
 
@@ -45,12 +45,5 @@ class ExtendibleHashTableIndex : public Index {
   // container
   DiskExtendibleHashTable<KeyType, ValueType, KeyComparator> container_;
 };
-
-constexpr static const auto TWO_INTEGER_SIZE = 8;
-using IntegerKeyType = GenericKey<TWO_INTEGER_SIZE>;
-using IntegerValueType = RID;
-using IntegerComparatorType = GenericComparator<TWO_INTEGER_SIZE>;
-using HashTableIndexForTwoIntegerColumn =
-    ExtendibleHashTableIndex<IntegerKeyType, IntegerValueType, IntegerComparatorType>;
 
 }  // namespace bustub

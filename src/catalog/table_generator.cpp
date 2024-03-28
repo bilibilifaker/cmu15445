@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <random>
 #include <vector>
-#include "common/config.h"
 
 namespace bustub {
 
@@ -77,8 +76,9 @@ void TableGenerator::FillTable(TableInfo *info, TableInsertMeta *table_meta) {
       for (const auto &col : values) {
         entry.emplace_back(col[i]);
       }
-      auto rid = info->table_->InsertTuple(TupleMeta{0, false}, Tuple(entry, &info->schema_));
-      BUSTUB_ENSURE(rid != std::nullopt, "Sequential insertion cannot fail");
+      RID rid;
+      bool inserted = info->table_->InsertTuple(Tuple(entry, &info->schema_), &rid, exec_ctx_->GetTransaction());
+      BUSTUB_ENSURE(inserted, "Sequential insertion cannot fail");
       num_inserted++;
     }
   }
