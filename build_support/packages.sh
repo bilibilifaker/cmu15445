@@ -7,6 +7,8 @@
 ## build and run the DBMS.
 ##
 ## Supported environments:
+##  * Ubuntu 18.04 (x86-64)
+##  * Ubuntu 20.04 (x86-64)
 ##  * Ubuntu 22.04 (x86-64)
 ##  * macOS 11 Big Sur (x86-64 or ARM)
 ##  * macOS 12 Monterey (x86-64 or ARM)
@@ -21,7 +23,7 @@ main() {
     else
         echo "PACKAGES WILL BE INSTALLED. THIS MAY BREAK YOUR EXISTING TOOLCHAIN."
         echo "YOU ACCEPT ALL RESPONSIBILITY BY PROCEEDING."
-        read -p "Proceed? [y/N] : " yn
+        read -p "Proceed? [Y/n] : " yn
     
         case $yn in
             Y|y) install;;
@@ -69,7 +71,7 @@ install_mac() {
   # Install Homebrew.
   if test ! $(which brew); then
     echo "Installing Homebrew (https://brew.sh/)"
-    bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+    ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
   fi
   # Update Homebrew.
   brew update
@@ -78,8 +80,7 @@ install_mac() {
   brew ls --versions coreutils || brew install coreutils
   brew ls --versions doxygen || brew install doxygen
   brew ls --versions git || brew install git
-  (brew ls --versions llvm | grep 14) || brew install llvm@14
-  brew ls --versions libelf || brew install libelf
+  (brew ls --versions llvm | grep 12) || brew install llvm@12
 }
 
 install_linux() {
@@ -88,16 +89,15 @@ install_linux() {
   # Install packages.
   apt-get -y install \
       build-essential \
-      clang-14 \
-      clang-format-14 \
-      clang-tidy-14 \
+      clang-12 \
+      clang-format-12 \
+      clang-tidy-12 \
       cmake \
       doxygen \
       git \
+      g++-12 \
       pkg-config \
-      zlib1g-dev \
-      libelf-dev \
-      libdwarf-dev
+      zlib1g-dev
 }
 
 main "$@"

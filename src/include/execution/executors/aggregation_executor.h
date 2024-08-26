@@ -48,6 +48,7 @@ class SimpleAggregationHashTable {
     for (const auto &agg_type : agg_types_) {
       switch (agg_type) {
         case AggregationType::CountStarAggregate:
+        //当对空表执行聚合时，CountStarAggregate应返回零，
           // Count start starts at zero.
           values.emplace_back(ValueFactory::GetIntegerValue(0));
           break;
@@ -55,7 +56,8 @@ class SimpleAggregationHashTable {
         case AggregationType::SumAggregate:
         case AggregationType::MinAggregate:
         case AggregationType::MaxAggregate:
-          // Others starts at null.
+
+          // Others starts at null.所有其他聚合类型应返回integer_ull
           values.emplace_back(ValueFactory::GetNullValueByType(TypeId::INTEGER));
           break;
       }
@@ -65,15 +67,17 @@ class SimpleAggregationHashTable {
 
   /**
    * TODO(Student)
-   *
+   * 将输入进行聚合操作，加入到聚合结果中
    * Combines the input into the aggregation result.
    * @param[out] result The output aggregate value
    * @param input The input value
    */
   void CombineAggregateValues(AggregateValue *result, const AggregateValue &input) {
+    //注意处理null值
     for (uint32_t i = 0; i < agg_exprs_.size(); i++) {
       switch (agg_types_[i]) {
         case AggregationType::CountStarAggregate:
+        //CountStarAggregate统计记录的个数，包含null值，其余聚合算子均不计算null值
           result->aggregates_[i] = result->aggregates_[i].Add(ValueFactory::GetIntegerValue(1));
           break;
         case AggregationType::CountAggregate:
@@ -115,9 +119,11 @@ class SimpleAggregationHashTable {
    * @param agg_val the value to be inserted
    */
   void InsertCombine(const AggregateKey &agg_key, const AggregateValue &agg_val) {
+    //若当前 hashmap 中没有 group by 的记录，则创建初值；
     if (ht_.count(agg_key) == 0) {
       ht_.insert({agg_key, GenerateInitialAggregateValue()});
     }
+    //若已有记录，则按 aggregate 规则逐一更新所有的 aggregate 字段，例如取 max/min，求 sum 等等
     CombineAggregateValues(&ht_[agg_key], agg_val);
   }
 
@@ -153,7 +159,10 @@ class SimpleAggregationHashTable {
     auto operator!=(const Iterator &other) -> bool { return this->iter_ != other.iter_; }
 
    private:
-    /** Aggregates map */
+    /** 
+     * Aggregates map 
+     * 
+     * */
     std::unordered_map<AggregateKey, AggregateValue>::const_iterator iter_;
   };
 
@@ -166,6 +175,8 @@ class SimpleAggregationHashTable {
   auto Size() -> size_t { return ht_.size(); }
 
  private:
+ //SimpleAggregationHashTable 维护一张 hashmap，键为 AggregateKey，值为 AggregateValue
+  //* key 代表 group by 的字段的数组，value 则是需要 aggregate 的字段的数组。
   /** The hash table is just a map from aggregate keys to aggregate values */
   std::unordered_map<AggregateKey, AggregateValue> ht_{};
   /** The aggregate expressions that we have */
@@ -177,6 +188,7 @@ class SimpleAggregationHashTable {
 /**
  * AggregationExecutor executes an aggregation operation (e.g. COUNT, SUM, MIN, MAX)
  * over the tuples produced by a child executor.
+ * AggregationExecutor对子执行器生成的元组执行聚合操作（例如COUNT、SUM、MIN、MAX）。
  */
 class AggregationExecutor : public AbstractExecutor {
  public:

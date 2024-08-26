@@ -28,11 +28,14 @@
 
 namespace bustub {
 
-/** ArithmeticType represents the type of logic operation that we want to perform. */
+/** ArithmeticType represents the type of logic operation that we want to perform.
+ * ArithmeticType表示我们要执行的逻辑运算的类型，包含与和或
+ */
 enum class LogicType { And, Or };
 
 /**
  * LogicExpression represents two expressions being computed.
+ * LogicExpression表示正在计算的两个表达式。
  */
 class LogicExpression : public AbstractExpression {
  public:
@@ -43,7 +46,8 @@ class LogicExpression : public AbstractExpression {
       throw bustub::NotImplementedException("expect boolean from either side");
     }
   }
-
+  
+  //Ev参数为 tuple 和 tuple 对应的 schema，返回从这个 tuple 中提取数据后代入表达式计算得到的结果。
   auto Evaluate(const Tuple *tuple, const Schema &schema) const -> Value override {
     Value lhs = GetChildAt(0)->Evaluate(tuple, schema);
     Value rhs = GetChildAt(1)->Evaluate(tuple, schema);

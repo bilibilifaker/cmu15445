@@ -5,6 +5,11 @@
 //
 // Identification: src/page/b_plus_tree_leaf_page.cpp
 //
+/*
+Leaf Tree Page 中，Pair 的 Key 也是 Key，而 Value 则是 RID（RID 即是 PageID+SlotID，
+用来定位一条记录在哪个 Page 的具体哪个 Offset）。
+而 Leaf 中的 K-V 则是一一对应的，RID[i] 就是 Key[i] 对应的记录。
+*/
 // Copyright (c) 2018, Carnegie Mellon University Database Group
 //
 //===----------------------------------------------------------------------===//
@@ -60,6 +65,7 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::GetItem(int index) -> const MappingType & { ret
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(const KeyType &key, const KeyComparator &keyComparator) const -> int {
+  //二分查找当前key所在的位置
   auto target = std::lower_bound(array_, array_ + GetSize(), key, [&keyComparator](const auto &pair, auto k) {
     return keyComparator(pair.first, k) < 0;
   });
@@ -69,6 +75,7 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(const KeyType &key, const KeyComparato
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &keyComparator)
     -> int {
+  //插入kv,发表关于插入结束后的size
   auto distance_in_array = KeyIndex(key, keyComparator);
   if (distance_in_array == GetSize()) {
     *(array_ + distance_in_array) = {key, value};
@@ -87,6 +94,7 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &val
   return GetSize();
 }
 
+//将当前page的一半数据移动到recipient,服务于分裂操作
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *recipient) {
   int start_split_indx = GetMinSize();
@@ -99,6 +107,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyNFrom(MappingType *items, int size) {
   IncreaseSize(size);
 }
 
+//在当前page中查找kv
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::Lookup(const KeyType &key, ValueType *value, const KeyComparator &keyComparator) const
     -> bool {
@@ -110,6 +119,7 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::Lookup(const KeyType &key, ValueType *value, co
   return true;
 }
 
+//删除某条记录
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveAndDeleteRecord(const KeyType &key, const KeyComparator &keyComparator) -> int {
   int target_in_array = KeyIndex(key, keyComparator);
@@ -121,6 +131,7 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveAndDeleteRecord(const KeyType &key, const
   return GetSize();
 }
 
+//将所有数据移动到recipient，服务于合并操作
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveAllTo(BPlusTreeLeafPage *recipient) {
   recipient->CopyNFrom(array_, GetSize());
@@ -128,6 +139,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveAllTo(BPlusTreeLeafPage *recipient) {
   SetSize(0);
 }
 
+//将数据的第一项移动到recipient的末尾，服务于偷取兄弟KV操作
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveFirstToEndOf(BPlusTreeLeafPage *recipient) {
   auto first_item = GetItem(0);
@@ -142,6 +154,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyLastFrom(const MappingType &item) {
   IncreaseSize(1);
 }
 
+//将数据的最后一项移动到recipient的头，服务于偷取兄弟KV操作
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveLastToFrontOf(BPlusTreeLeafPage *recipient) {
   auto last_item = GetItem(GetSize() - 1);
