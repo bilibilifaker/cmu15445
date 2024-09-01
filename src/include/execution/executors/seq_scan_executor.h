@@ -49,7 +49,6 @@ class SeqScanExecutor : public AbstractExecutor {
 
  private:
   /** The sequential scan plan node to be executed */
-  //要执行的顺序扫描计划节点
   const SeqScanPlanNode *plan_;
   TableIterator table_iter_ = {nullptr, RID(), nullptr};
   const TableInfo *table_info_;

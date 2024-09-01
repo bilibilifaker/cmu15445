@@ -26,7 +26,6 @@ namespace bustub {
 
 /**
  * The SeqScanPlanNode represents a sequential table scan operation.
- * SeqScanPlanNode表示一种顺序表扫描操作。
  */
 class SeqScanPlanNode : public AbstractPlanNode {
  public:
@@ -60,7 +59,6 @@ class SeqScanPlanNode : public AbstractPlanNode {
 
   /** The predicate to filter in seqscan. It will ALWAYS be nullptr until you enable the MergeFilterScan rule.
       You don't need to handle it to get a perfect score as of in Fall 2022.
-      要在seqscan中筛选的谓词
   */
   AbstractExpressionRef filter_predicate_;
 

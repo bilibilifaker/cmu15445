@@ -25,45 +25,38 @@ DeleteExecutor::DeleteExecutor(ExecutorContext *exec_ctx, const DeletePlanNode *
 void DeleteExecutor::Init() {
   child_executor_->Init();
   try {
-    //为表加上 IX 锁
     bool is_locked = exec_ctx_->GetLockManager()->LockTable(
         exec_ctx_->GetTransaction(), LockManager::LockMode::INTENTION_EXCLUSIVE, table_info_->oid_);
     if (!is_locked) {
       throw ExecutionException("Delete Executor Get Table Lock Failed");
     }
-  } catch (TransactionAbortException& e) {
+  } catch (TransactionAbortException e) {
     throw ExecutionException("Delete Executor Get Table Lock Failed");
   }
   table_indexes_ = exec_ctx_->GetCatalog()->GetTableIndexes(table_info_->name_);
 }
 
-
 auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
-  //删除和插入很像，
   if (is_end_) {
     return false;
   }
   Tuple to_delete_tuple{};
   RID emit_rid;
   int32_t delete_count = 0;
-  
-  
+
   while (child_executor_->Next(&to_delete_tuple, &emit_rid)) {
     try {
-      //再为行加 X 锁
       bool is_locked = exec_ctx_->GetLockManager()->LockRow(
           exec_ctx_->GetTransaction(), LockManager::LockMode::EXCLUSIVE, table_info_->oid_, emit_rid);
       if (!is_locked) {
         throw ExecutionException("Delete Executor Get Row Lock Failed");
       }
-    } catch (TransactionAbortException& e) {
+    } catch (TransactionAbortException e) {
       throw ExecutionException("Delete Executor Get Row Lock Failed");
     }
-    //Delete 时，并不是直接删除，而是将 tuple 标记为删除状态，也就是逻辑删除。
-    //（在事务提交后，再进行物理删除，Project 3 中无需实现）
+
     bool deleted = table_info_->table_->MarkDelete(emit_rid, exec_ctx_->GetTransaction());
 
-    //更新索引
     if (deleted) {
       std::for_each(table_indexes_.begin(), table_indexes_.end(),
                     [&to_delete_tuple, &rid, &table_info = table_info_, &exec_ctx = exec_ctx_](IndexInfo *index) {

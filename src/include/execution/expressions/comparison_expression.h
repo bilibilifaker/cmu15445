@@ -24,9 +24,7 @@
 
 namespace bustub {
 
-/** ComparisonType represents the type of comparison that we want to perform. 
- * 比较运算类型，包含=,!=,<,<=,>,>=
-*/
+/** ComparisonType represents the type of comparison that we want to perform. */
 enum class ComparisonType { Equal, NotEqual, LessThan, LessThanOrEqual, GreaterThan, GreaterThanOrEqual };
 
 /**
